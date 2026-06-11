@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🫒 Olive Grove Detector — Tunisia</title>
+    <meta name="description" content="AI-powered olive grove detection from Sentinel-2 satellite imagery using U-Net deep learning">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Animated background -->
+    <div class="bg-grid"></div>
+    <div class="bg-gradient"></div>
+
+    <!-- Header -->
+    <header id="header">
+        <div class="header-inner">
+            <div class="logo">
+                <span class="logo-icon">🫒</span>
+                <div class="logo-text">
+                    <h1>Olive Grove Detector</h1>
+                    <span class="subtitle">Sentinel-2 • U-Net • Tunisia</span>
+                </div>
+            </div>
+            <div class="status-badge" id="statusBadge">
+                <span class="status-dot"></span>
+                <span class="status-text">Checking...</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Upload Section -->
+        <section class="upload-section" id="uploadSection">
+            <div class="upload-card glass">
+                <div class="upload-zone" id="dropZone">
+                    <div class="upload-icon">
+                        <svg viewBox="0 0 64 64" fill="none">
+                            <path d="M32 4L12 24h14v20h12V24h14L32 4z" fill="currentColor" opacity="0.3"/>
+                            <path d="M8 44v12a4 4 0 004 4h40a4 4 0 004-4V44" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                            <path d="M32 8v32" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                            <path d="M20 20l12-12 12 12" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <h2>Upload Sentinel-2 GeoTIFF</h2>
+                    <p>Drop your 14-band Sentinel-2 GeoTIFF here, or click to browse</p>
+                    <p class="upload-hint">Supported: .tif, .tiff • 14 bands (B2-B12 + NDVI, NDWI, EVI, SAVI)</p>
+                    <input type="file" id="fileInput" accept=".tif,.tiff" hidden>
+                    <button class="btn btn-primary" id="browseBtn">
+                        <span>Browse Files</span>
+                    </button>
+                </div>
+
+                <!-- Progress bar -->
+                <div class="progress-container" id="progressContainer" style="display:none">
+                    <div class="progress-info">
+                        <span class="progress-label" id="progressLabel">Uploading...</span>
+                        <span class="progress-pct" id="progressPct">0%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Info cards -->
+            <div class="info-grid">
+                <div class="info-card glass">
+                    <div class="info-icon">🛰️</div>
+                    <h3>Sentinel-2 Input</h3>
+                    <p>14-band multispectral imagery at 10m resolution with spectral indices</p>
+                </div>
+                <div class="info-card glass">
+                    <div class="info-icon">🧠</div>
+                    <h3>ResNet34-UNet</h3>
+                    <p>Transfer learning with pretrained encoder, optimized for small datasets</p>
+                </div>
+                <div class="info-card glass">
+                    <div class="info-icon">🗺️</div>
+                    <h3>3-Class Output</h3>
+                    <p>Background, olive extensif (traditional), and olive intensif (modern)</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results Section -->
+        <section class="results-section" id="resultsSection" style="display:none">
+            <div class="results-header">
+                <h2>
+                    <span class="results-icon">✨</span>
+                    Detection Results
+                </h2>
+                <button class="btn btn-ghost" id="newAnalysisBtn">
+                    ← New Analysis
+                </button>
+            </div>
+
+            <!-- Image Comparison -->
+            <div class="comparison-container glass">
+                <div class="comparison-tabs">
+                    <button class="tab active" data-tab="rgb">RGB Preview</button>
+                    <button class="tab" data-tab="overlay">Detection Overlay</button>
+                    <button class="tab" data-tab="split">Side by Side</button>
+                </div>
+                <div class="comparison-content">
+                    <div class="tab-panel active" id="panel-rgb">
+                        <div class="image-wrapper">
+                            <img id="rgbImage" alt="Sentinel-2 RGB composite">
+                        </div>
+                    </div>
+                    <div class="tab-panel" id="panel-overlay">
+                        <div class="image-wrapper overlay-wrapper">
+                            <img id="overlayRgb" alt="RGB base" class="overlay-base">
+                            <img id="overlayMask" alt="Detection mask" class="overlay-mask">
+                            <div class="opacity-control">
+                                <label>Overlay Opacity</label>
+                                <input type="range" id="opacitySlider" min="0" max="100" value="60">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tab-panel" id="panel-split">
+                        <div class="split-view">
+                            <div class="split-panel">
+                                <span class="split-label">Original</span>
+                                <img id="splitRgb" alt="Original">
+                            </div>
+                            <div class="split-panel">
+                                <span class="split-label">Detection</span>
+                                <img id="splitMask" alt="Detection" class="mask-on-dark">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div class="stats-grid">
+                <div class="stat-card glass" id="statConfidence">
+                    <div class="stat-value" id="valConfidence">—</div>
+                    <div class="stat-label">Model Confidence</div>
+                </div>
+                <div class="stat-card glass" id="statDimensions">
+                    <div class="stat-value" id="valDimensions">—</div>
+                    <div class="stat-label">Image Size (px)</div>
+                </div>
+                <div class="stat-card glass" id="statExtensif">
+                    <div class="stat-value extensif" id="valExtensif">—</div>
+                    <div class="stat-label">🌿 Extensif Coverage</div>
+                </div>
+                <div class="stat-card glass" id="statIntensif">
+                    <div class="stat-value intensif" id="valIntensif">—</div>
+                    <div class="stat-label">🌳 Intensif Coverage</div>
+                </div>
+            </div>
+
+            <!-- Class breakdown -->
+            <div class="breakdown-card glass">
+                <h3>Class Breakdown</h3>
+                <div id="classBreakdown"></div>
+            </div>
+
+            <!-- Download -->
+            <div class="download-section">
+                <a class="btn btn-primary btn-download" id="downloadBtn" href="#" download>
+                    ⬇ Download Mask GeoTIFF
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <!-- Legend -->
+    <div class="legend glass">
+        <div class="legend-item">
+            <span class="legend-color" style="background:#4CAF50"></span>
+            <span>Extensif</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-color" style="background:#FF9800"></span>
+            <span>Intensif</span>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
