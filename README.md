@@ -1,6 +1,14 @@
-# 🫒 ZitounEye — Mapping Tunisia's Olive Groves with Knowledge Learned in Spain
+<h1 align="center">🫒 Zitoun Eye · عين الزيتون</h1>
+<h3 align="center">Tunisia Olive Tree Detection: mapping Tunisia's olive groves with knowledge learned in Spain</h3>
 
-> **"Zitoun" (زيتون) means *olive* in Arabic.**
+<p align="center">
+  <img alt="Sentinel-2" src="https://img.shields.io/badge/data-Sentinel--2-1565c0"/>
+  <img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-U--Net%20%C2%B7%20EfficientNet--B4-ee4c2c"/>
+  <img alt="Olive IoU" src="https://img.shields.io/badge/olive%20IoU-0.69-2e7d32"/>
+  <img alt="Region" src="https://img.shields.io/badge/Spain%20%E2%86%92%20Tunisia-transfer-8d6e63"/>
+</p>
+
+> **"Zitoun" (زيتون) means *olive* in Arabic, so Zitoun Eye means "the olive eye".**
 > ZitounEye is a deep-learning model that looks at Sentinel-2 satellite imagery and labels every 10 m pixel as olive grove, vineyard, orchard, arable land, building, road or background.
 
 <p align="center">
