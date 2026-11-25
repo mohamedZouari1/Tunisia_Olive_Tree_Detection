@@ -1,0 +1,1434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Zitoun Eye — Find Every Olive Grove From Space</title>
+  <meta name="description" content="AI-powered olive grove detection. Draw any region on the map and let our 4-season Sentinel-2 model detect every olive grove in seconds."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+  /* ═══════════════════════════════════════════════════════════════
+     DESIGN TOKENS
+  ═══════════════════════════════════════════════════════════════ */
+  :root {
+    --black:   #080f04;
+    --dark:    #0d1a08;
+    --dark-2:  #142009;
+    --dark-3:  #1c2e0c;
+    --olive-9: #243b10;
+    --olive-8: #2f5013;
+    --olive-7: #3d6618;
+    --olive-6: #557e22;
+    --olive-5: #73a02c;
+    --olive-4: #96c238;
+    --olive-3: #bada50;
+    --olive-2: #d4ec7a;
+    --olive-1: #edf8bc;
+    --cream:   #f4f0e4;
+    --cream-2: #e8e2d0;
+    --earth:   #8b6914;
+    --white:   #ffffff;
+    --text-dark:   #e0ecc8;
+    --text-muted:  #7a9460;
+    --text-light:  #1a2e0a;
+    --radius-xl: 20px;
+    --radius-lg: 14px;
+    --radius:    10px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--dark);
+    color: var(--text-dark);
+    overflow-x: hidden;
+    line-height: 1.6;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     NAV
+  ═══════════════════════════════════════════════════════════════ */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 48px;
+    height: 72px;
+    background: rgba(8, 15, 4, 0);
+    backdrop-filter: blur(0px);
+    transition: background 0.4s, backdrop-filter 0.4s;
+    border-bottom: 1px solid transparent;
+  }
+  nav.scrolled {
+    background: rgba(8, 15, 4, 0.92);
+    backdrop-filter: blur(20px);
+    border-bottom-color: rgba(96, 162, 44, 0.15);
+  }
+  .nav-logo {
+    display: flex; align-items: center; gap: 12px;
+    text-decoration: none;
+  }
+  .nav-logo-icon {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--olive-7), var(--olive-4));
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 0 24px rgba(115, 160, 44, 0.35);
+  }
+  .nav-logo-text {
+    font-size: 20px; font-weight: 800;
+    background: linear-gradient(90deg, var(--olive-3), var(--olive-1));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    letter-spacing: -0.5px;
+  }
+  .nav-links {
+    display: flex; align-items: center; gap: 36px;
+    list-style: none;
+  }
+  .nav-links a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--text-dark); }
+  .nav-cta {
+    padding: 10px 24px;
+    background: linear-gradient(135deg, var(--olive-7), var(--olive-5));
+    color: var(--cream) !important;
+    border-radius: 30px;
+    font-weight: 600 !important;
+    transition: all 0.2s !important;
+    box-shadow: 0 4px 20px rgba(85, 126, 34, 0.4);
+  }
+  .nav-cta:hover {
+    background: linear-gradient(135deg, var(--olive-6), var(--olive-4)) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 30px rgba(85, 126, 34, 0.55) !important;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     HERO
+  ═══════════════════════════════════════════════════════════════ */
+  #hero {
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    overflow: hidden;
+    padding: 120px 48px 80px;
+  }
+
+  .hero-bg {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 120%, rgba(55, 100, 20, 0.35) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 40% at 80% 30%, rgba(35, 70, 12, 0.25) 0%, transparent 60%),
+      linear-gradient(180deg, #080f04 0%, #0d1a08 50%, #142009 100%);
+  }
+
+  /* Animated grain overlay */
+  .hero-bg::after {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  /* Floating olive leaf particles */
+  .leaf-particle {
+    position: absolute;
+    font-size: 28px;
+    opacity: 0;
+    animation: floatLeaf 12s infinite ease-in-out;
+    pointer-events: none;
+    filter: blur(0.5px);
+  }
+  @keyframes floatLeaf {
+    0%   { opacity: 0; transform: translateY(100vh) rotate(0deg); }
+    10%  { opacity: 0.15; }
+    90%  { opacity: 0.08; }
+    100% { opacity: 0; transform: translateY(-20vh) rotate(720deg); }
+  }
+
+  .hero-content {
+    position: relative; z-index: 2;
+    max-width: 900px;
+    text-align: center;
+  }
+
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 18px;
+    background: rgba(96, 162, 44, 0.1);
+    border: 1px solid rgba(96, 162, 44, 0.25);
+    border-radius: 30px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--olive-3);
+    margin-bottom: 32px;
+    letter-spacing: 0.3px;
+  }
+  .badge-dot {
+    width: 6px; height: 6px;
+    background: var(--olive-4);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50%      { opacity:0.4; transform:scale(0.6); }
+  }
+
+  .hero-headline {
+    font-size: clamp(3.2rem, 7vw, 5.8rem);
+    font-weight: 900;
+    line-height: 1.05;
+    letter-spacing: -2px;
+    color: var(--white);
+    margin-bottom: 24px;
+  }
+  .hero-headline .hl {
+    background: linear-gradient(90deg, var(--olive-3) 0%, var(--olive-1) 50%, var(--olive-2) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    display: inline-block;
+  }
+
+  .hero-sub {
+    font-size: clamp(1.05rem, 2vw, 1.3rem);
+    color: var(--text-muted);
+    max-width: 600px;
+    margin: 0 auto 44px;
+    font-weight: 400;
+    line-height: 1.7;
+  }
+
+  .hero-actions {
+    display: flex; align-items: center; gap: 16px; justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .btn-primary {
+    padding: 16px 36px;
+    background: linear-gradient(135deg, var(--olive-7) 0%, var(--olive-5) 100%);
+    color: var(--cream);
+    border: none;
+    border-radius: 50px;
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: all 0.25s;
+    box-shadow: 0 8px 36px rgba(85, 126, 34, 0.45);
+    letter-spacing: -0.2px;
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 48px rgba(85, 126, 34, 0.6);
+    background: linear-gradient(135deg, var(--olive-6), var(--olive-4));
+  }
+
+  .btn-ghost {
+    padding: 16px 36px;
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid rgba(122, 148, 96, 0.3);
+    border-radius: 50px;
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: all 0.25s;
+  }
+  .btn-ghost:hover {
+    border-color: var(--olive-5);
+    color: var(--text-dark);
+  }
+
+  /* Satellite imagery frame in hero */
+  .hero-visual {
+    position: absolute;
+    bottom: -60px; right: -80px;
+    width: 520px; height: 380px;
+    border-radius: 20px;
+    overflow: hidden;
+    opacity: 0.15;
+    transform: rotate(-8deg);
+    border: 1px solid rgba(96,162,44,0.2);
+    background: var(--dark-3);
+    pointer-events: none;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     STATS BAR
+  ═══════════════════════════════════════════════════════════════ */
+  #stats {
+    background: var(--dark-2);
+    border-top: 1px solid rgba(96,162,44,0.1);
+    border-bottom: 1px solid rgba(96,162,44,0.1);
+    padding: 56px 48px;
+  }
+  .stats-grid {
+    max-width: 1100px; margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+  }
+  .stat-item {
+    text-align: center;
+    padding: 0 24px;
+    border-right: 1px solid rgba(96,162,44,0.1);
+  }
+  .stat-item:last-child { border-right: none; }
+  .stat-num {
+    font-size: clamp(2.8rem, 5vw, 4rem);
+    font-weight: 900;
+    letter-spacing: -2px;
+    background: linear-gradient(90deg, var(--olive-3), var(--olive-2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+  .stat-label {
+    font-size: 15px;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     HOW IT WORKS
+  ═══════════════════════════════════════════════════════════════ */
+  #how {
+    padding: 120px 48px;
+    background: var(--dark);
+  }
+  .section-label {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--olive-5);
+    margin-bottom: 16px;
+  }
+  .section-title {
+    text-align: center;
+    font-size: clamp(2.2rem, 4vw, 3.5rem);
+    font-weight: 900;
+    letter-spacing: -1.5px;
+    color: var(--white);
+    margin-bottom: 16px;
+    line-height: 1.1;
+  }
+  .section-sub {
+    text-align: center;
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    max-width: 540px;
+    margin: 0 auto 72px;
+    line-height: 1.7;
+  }
+  .steps-grid {
+    max-width: 1100px; margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+  .step-card {
+    background: var(--dark-2);
+    border: 1px solid rgba(96,162,44,0.1);
+    border-radius: var(--radius-xl);
+    padding: 40px 36px;
+    position: relative;
+    transition: border-color 0.3s, transform 0.3s;
+  }
+  .step-card:hover {
+    border-color: rgba(96,162,44,0.3);
+    transform: translateY(-4px);
+  }
+  .step-num {
+    font-size: 56px;
+    font-weight: 900;
+    letter-spacing: -3px;
+    background: linear-gradient(90deg, var(--olive-9), var(--olive-7));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    line-height: 1;
+    margin-bottom: 20px;
+  }
+  .step-icon {
+    font-size: 40px;
+    margin-bottom: 16px;
+    display: block;
+  }
+  .step-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--white);
+    margin-bottom: 12px;
+    letter-spacing: -0.5px;
+  }
+  .step-desc {
+    font-size: 1rem;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+  .step-card::after {
+    content: '→';
+    position: absolute;
+    right: -14px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 20px;
+    color: var(--olive-7);
+    font-weight: 300;
+  }
+  .step-card:last-child::after { display: none; }
+
+  /* ═══════════════════════════════════════════════════════════════
+     INTERACTIVE TOOL SECTION
+  ═══════════════════════════════════════════════════════════════ */
+  #tool {
+    background: var(--cream);
+    padding: 100px 48px;
+    position: relative;
+  }
+  #tool .section-label { color: var(--olive-7); }
+  #tool .section-title { color: var(--text-light); }
+  #tool .section-sub   { color: #4a6034; }
+
+  .tool-layout {
+    max-width: 1200px; margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 28px;
+    align-items: start;
+  }
+
+  /* Map container */
+  .map-wrap {
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.25);
+    position: relative;
+    border: 2px solid rgba(85, 126, 34, 0.25);
+  }
+  #map {
+    height: 560px;
+  }
+  .leaflet-tile-pane {
+    filter: saturate(0.9) brightness(0.95);
+  }
+
+  /* Map instruction overlay */
+  .map-overlay-hint {
+    position: absolute;
+    top: 16px; left: 50%; transform: translateX(-50%);
+    z-index: 500;
+    background: rgba(8, 15, 4, 0.9);
+    border: 1px solid rgba(96,162,44,0.3);
+    border-radius: 30px;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dark);
+    pointer-events: none;
+    white-space: nowrap;
+    backdrop-filter: blur(10px);
+    transition: opacity 0.3s;
+  }
+  .map-overlay-hint.hidden { opacity: 0; }
+
+  /* Controls beneath map */
+  .map-controls {
+    margin-top: 16px;
+    display: flex; align-items: center; gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .ctrl-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 24px;
+    border-radius: 30px;
+    border: 2px solid transparent;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s;
+    letter-spacing: -0.2px;
+  }
+  .ctrl-btn-draw {
+    background: var(--dark);
+    color: var(--text-dark);
+    border-color: rgba(96,162,44,0.3);
+  }
+  .ctrl-btn-draw:hover, .ctrl-btn-draw.active {
+    border-color: var(--olive-5);
+    color: var(--white);
+    background: var(--dark-2);
+  }
+  .ctrl-btn-draw.active {
+    background: rgba(55, 100, 20, 0.15);
+    border-color: var(--olive-5);
+    box-shadow: 0 0 20px rgba(85,126,34,0.25);
+  }
+
+  .ctrl-btn-analyze {
+    background: var(--cream-2);
+    color: #4a6034;
+    border-color: rgba(85,126,34,0.2);
+    opacity: 0.5;
+    pointer-events: none;
+    flex: 1;
+  }
+  .ctrl-btn-analyze.ready {
+    background: linear-gradient(135deg, var(--olive-7), var(--olive-5));
+    color: var(--cream);
+    border-color: transparent;
+    opacity: 1;
+    pointer-events: all;
+    box-shadow: 0 8px 32px rgba(85,126,34,0.45);
+  }
+  .ctrl-btn-analyze.ready:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 40px rgba(85,126,34,0.6);
+  }
+  .ctrl-btn-analyze.loading {
+    background: var(--olive-8);
+    color: var(--text-muted);
+    pointer-events: none;
+    opacity: 1;
+  }
+
+  .ctrl-btn-clear {
+    background: transparent;
+    color: #8a7050;
+    border-color: rgba(139,105,20,0.2);
+  }
+  .ctrl-btn-clear:hover { color: #c0804a; border-color: rgba(192,128,74,0.4); }
+
+  /* Spinner */
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.2);
+    border-top-color: var(--olive-3);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── RIGHT PANEL ── */
+  .info-panel {
+    display: flex; flex-direction: column; gap: 16px;
+  }
+
+  .panel-card {
+    background: var(--dark);
+    border: 1px solid rgba(96,162,44,0.12);
+    border-radius: var(--radius-xl);
+    padding: 24px;
+    color: var(--text-dark);
+  }
+
+  .panel-card-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  /* Step indicator */
+  .step-indicators { display: flex; flex-direction: column; gap: 16px; }
+  .step-ind {
+    display: flex; align-items: flex-start; gap: 14px;
+  }
+  .step-ind-num {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+    flex-shrink: 0;
+    background: rgba(96,162,44,0.08);
+    border: 1.5px solid rgba(96,162,44,0.2);
+    color: var(--text-muted);
+    transition: all 0.3s;
+  }
+  .step-ind.active .step-ind-num {
+    background: var(--olive-7);
+    border-color: var(--olive-6);
+    color: var(--cream);
+    box-shadow: 0 0 16px rgba(85,126,34,0.4);
+  }
+  .step-ind.done .step-ind-num {
+    background: rgba(96,162,44,0.15);
+    border-color: rgba(96,162,44,0.4);
+    color: var(--olive-4);
+  }
+  .step-ind-text {}
+  .step-ind-label {
+    font-size: 14px; font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+    transition: color 0.3s;
+  }
+  .step-ind.active .step-ind-label { color: var(--white); }
+  .step-ind-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  /* Results panel */
+  .results-box { display: none; flex-direction: column; gap: 12px; }
+  .results-box.show { display: flex; }
+
+  .result-headline {
+    font-size: 2.8rem; font-weight: 900;
+    letter-spacing: -1.5px;
+    color: var(--olive-3);
+    line-height: 1;
+  }
+  .result-sub {
+    font-size: 12px; color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  .class-bar-row {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px;
+  }
+  .class-name { width: 90px; flex-shrink: 0; color: var(--text-muted); }
+  .class-bar-track {
+    flex: 1;
+    height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .class-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .class-pct {
+    width: 36px; text-align: right;
+    color: var(--white); font-weight: 600;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Tile info */
+  .tile-info {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 12px;
+    background: rgba(96,162,44,0.06);
+    border: 1px solid rgba(96,162,44,0.12);
+    border-radius: 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: monospace;
+  }
+
+  /* Error box */
+  .error-box {
+    display: none;
+    padding: 14px 16px;
+    background: rgba(215, 68, 68, 0.08);
+    border: 1px solid rgba(215,68,68,0.2);
+    border-radius: 10px;
+    font-size: 13px;
+    color: #f87171;
+    line-height: 1.5;
+  }
+  .error-box.show { display: block; }
+
+  /* ═══════════════════════════════════════════════════════════════
+     TECHNOLOGY SECTION
+  ═══════════════════════════════════════════════════════════════ */
+  #tech {
+    background: var(--dark-2);
+    padding: 120px 48px;
+  }
+  .tech-grid {
+    max-width: 1100px; margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: center;
+  }
+  .tech-copy .section-title,
+  .tech-copy .section-label { text-align: left; }
+  .tech-copy .section-sub { text-align: left; margin: 0 0 40px; }
+
+  .tech-features { display: flex; flex-direction: column; gap: 16px; }
+  .tech-feature {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 16px;
+    background: rgba(96,162,44,0.04);
+    border: 1px solid rgba(96,162,44,0.1);
+    border-radius: var(--radius-lg);
+  }
+  .tech-feature-icon { font-size: 24px; flex-shrink: 0; }
+  .tech-feature-title { font-size: 15px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+  .tech-feature-desc  { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+
+  .arch-visual {
+    background: var(--dark-3);
+    border: 1px solid rgba(96,162,44,0.12);
+    border-radius: var(--radius-xl);
+    padding: 32px;
+    display: flex; flex-direction: column; gap: 12px;
+    font-family: monospace;
+  }
+  .arch-layer {
+    padding: 12px 16px;
+    background: rgba(96,162,44,0.06);
+    border: 1px solid rgba(96,162,44,0.12);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .arch-layer-name { font-size: 13px; color: var(--text-dark); font-weight: 600; }
+  .arch-layer-meta { font-size: 11px; color: var(--text-muted); }
+  .arch-arrow {
+    text-align: center; color: var(--olive-7); font-size: 18px; margin: -4px 0;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     FOOTER
+  ═══════════════════════════════════════════════════════════════ */
+  footer {
+    background: var(--black);
+    border-top: 1px solid rgba(96,162,44,0.1);
+    padding: 56px 48px 40px;
+  }
+  .footer-inner {
+    max-width: 1100px; margin: 0 auto;
+    display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 48px;
+    margin-bottom: 40px;
+  }
+  .footer-brand { font-size: 22px; font-weight: 900; margin-bottom: 12px;
+    background: linear-gradient(90deg, var(--olive-3), var(--olive-2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .footer-brand-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+  .footer-col-title { font-size: 12px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--text-muted); margin-bottom: 16px; }
+  .footer-links { display: flex; flex-direction: column; gap: 10px; }
+  .footer-links a { font-size: 14px; color: #556840; text-decoration: none;
+    transition: color 0.2s; }
+  .footer-links a:hover { color: var(--text-dark); }
+  .footer-bottom {
+    max-width: 1100px; margin: 0 auto;
+    display: flex; justify-content: space-between; align-items: center;
+    padding-top: 24px;
+    border-top: 1px solid rgba(96,162,44,0.08);
+    font-size: 13px; color: #3d5028;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     COVERAGE ZONES STYLE
+  ═══════════════════════════════════════════════════════════════ */
+  .coverage-zone-label {
+    background: transparent;
+    border: none;
+    color: rgba(163, 194, 64, 0.9);
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     RESPONSIVE
+  ═══════════════════════════════════════════════════════════════ */
+  @media (max-width: 900px) {
+    nav { padding: 0 20px; }
+    .nav-links { display: none; }
+    #hero { padding: 100px 24px 60px; }
+    #stats { padding: 40px 24px; }
+    .stats-grid { grid-template-columns: 1fr 1fr; gap: 24px; }
+    .stat-item { border-right: none; border-bottom: 1px solid rgba(96,162,44,0.1); padding-bottom: 24px; }
+    #how, #tech, #tool { padding: 80px 24px; }
+    .steps-grid { grid-template-columns: 1fr; }
+    .step-card::after { display: none; }
+    .tool-layout { grid-template-columns: 1fr; }
+    .tech-grid { grid-template-columns: 1fr; }
+    footer { padding: 40px 24px 30px; }
+    .footer-inner { grid-template-columns: 1fr; gap: 28px; }
+  }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════ NAV ══════════════════════════════════ -->
+<nav id="navbar">
+  <a href="#" class="nav-logo">
+    <div class="nav-logo-icon">🫒</div>
+    <span class="nav-logo-text">Zitoun Eye</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#how">How It Works</a></li>
+    <li><a href="#tool">Analyze</a></li>
+    <li><a href="#tech">Technology</a></li>
+    <li><a href="#tool" class="nav-cta">Try It Free →</a></li>
+  </ul>
+</nav>
+
+<!-- ══════════════════════════════════ HERO ══════════════════════════════════ -->
+<section id="hero">
+  <div class="hero-bg"></div>
+
+  <!-- Floating olive particles -->
+  <span class="leaf-particle" style="left:8%;animation-delay:0s;animation-duration:14s;">🫒</span>
+  <span class="leaf-particle" style="left:22%;animation-delay:3s;animation-duration:11s;font-size:20px;">🌿</span>
+  <span class="leaf-particle" style="left:55%;animation-delay:6s;animation-duration:16s;">🍃</span>
+  <span class="leaf-particle" style="left:72%;animation-delay:1.5s;animation-duration:13s;font-size:20px;">🫒</span>
+  <span class="leaf-particle" style="left:88%;animation-delay:4.5s;animation-duration:12s;">🌿</span>
+  <span class="leaf-particle" style="left:38%;animation-delay:9s;animation-duration:15s;font-size:22px;">🍃</span>
+
+  <div class="hero-content">
+    <div class="hero-badge">
+      <span class="badge-dot"></span>
+      AI Model Active · EfficientNet-B4 U-Net · IoU 0.68
+    </div>
+
+    <h1 class="hero-headline">
+      Find Every<br/>
+      <span class="hl">Olive Grove</span><br/>
+      From Space
+    </h1>
+
+    <p class="hero-sub">
+      Draw any region on a satellite map. Our 4-season deep learning model analyzes
+      56 spectral bands and instantly reveals every olive grove with 68% accuracy —
+      even distinguishing them from almonds and palms.
+    </p>
+
+    <div class="hero-actions">
+      <a href="#tool" class="btn-primary">🗺️ Start Mapping Now</a>
+      <a href="#how" class="btn-ghost">See how it works ↓</a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════ STATS ════════════════════════════════ -->
+<section id="stats">
+  <div class="stats-grid">
+    <div class="stat-item">
+      <div class="stat-num" data-target="0.68" data-decimal="2">0.00</div>
+      <div class="stat-label">Olive IoU Score</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num" data-target="56" data-decimal="0">0</div>
+      <div class="stat-label">Spectral Bands</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num" data-target="4" data-decimal="0">0</div>
+      <div class="stat-label">Seasons Per Analysis</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num" data-target="7" data-decimal="0">0</div>
+      <div class="stat-label">Land Classes Detected</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════ HOW IT WORKS ═════════════════════════════ -->
+<section id="how">
+  <p class="section-label">Simple Process</p>
+  <h2 class="section-title">Three Steps to<br/>Discover Olive Groves</h2>
+  <p class="section-sub">No GIS expertise needed. Just draw, analyze, and explore — our AI does the heavy lifting.</p>
+
+  <div class="steps-grid">
+    <div class="step-card">
+      <span class="step-num">01</span>
+      <span class="step-icon">✏️</span>
+      <h3 class="step-title">Draw Your Area</h3>
+      <p class="step-desc">Click "Draw Area" and drag a rectangle over any region of interest on the satellite map. Focus on agricultural areas in Tunisia — the cradle of Mediterranean olive culture.</p>
+    </div>
+    <div class="step-card">
+      <span class="step-num">02</span>
+      <span class="step-icon">🧠</span>
+      <h3 class="step-title">AI Analyzes</h3>
+      <p class="step-desc">Our EfficientNet-B4 U-Net model processes 56 spectral bands from 4 seasons of Sentinel-2 satellite data. It understands how plants grow throughout the year, not just what they look like today.</p>
+    </div>
+    <div class="step-card">
+      <span class="step-num">03</span>
+      <span class="step-icon">🫒</span>
+      <h3 class="step-title">Discover Groves</h3>
+      <p class="step-desc">Every olive grove lights up on the map. See the exact coverage percentage, hectare estimates, and a full breakdown of all 7 land classes in your selected area.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════ INTERACTIVE TOOL ═════════════════════════ -->
+<section id="tool">
+  <p class="section-label">Interactive Analysis</p>
+  <h2 class="section-title">Analyze Any Region</h2>
+  <p class="section-sub">Draw within the green dashed zones — those are areas with 4-season satellite data ready for AI analysis.</p>
+
+  <div class="tool-layout">
+    <!-- Left: Map -->
+    <div>
+      <div class="map-wrap">
+        <div id="map"></div>
+        <div class="map-overlay-hint" id="hint-overlay">
+          📡 Draw a rectangle within the green zones to analyze
+        </div>
+      </div>
+
+      <div class="map-controls">
+        <button class="ctrl-btn ctrl-btn-draw" id="btn-draw" onclick="toggleDraw()">
+          ✏️ Draw Area
+        </button>
+        <button class="ctrl-btn ctrl-btn-analyze" id="btn-analyze" onclick="runAnalysis()">
+          🧠 Analyze Now
+        </button>
+        <button class="ctrl-btn ctrl-btn-clear" id="btn-clear" onclick="clearSelection()" style="display:none;">
+          ✕ Clear
+        </button>
+      </div>
+    </div>
+
+    <!-- Right: Info panel -->
+    <div class="info-panel">
+
+      <!-- Steps guide -->
+      <div class="panel-card" id="steps-guide">
+        <div class="panel-card-title">Your Progress</div>
+        <div class="step-indicators">
+          <div class="step-ind active" id="ind-1">
+            <div class="step-ind-num">1</div>
+            <div class="step-ind-text">
+              <div class="step-ind-label">Draw Your Area</div>
+              <div class="step-ind-desc">Click "Draw Area" then drag a rectangle on the map over a green zone.</div>
+            </div>
+          </div>
+          <div class="step-ind" id="ind-2">
+            <div class="step-ind-num">2</div>
+            <div class="step-ind-text">
+              <div class="step-ind-label">Run the AI</div>
+              <div class="step-ind-desc">Click "Analyze Now" — our model processes 56 bands across 4 seasons.</div>
+            </div>
+          </div>
+          <div class="step-ind" id="ind-3">
+            <div class="step-ind-num">3</div>
+            <div class="step-ind-text">
+              <div class="step-ind-label">View Results</div>
+              <div class="step-ind-desc">Olive groves appear as green overlays with full statistics.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Error box -->
+      <div class="error-box" id="error-box"></div>
+
+      <!-- Results card (hidden until analysis) -->
+      <div class="panel-card" id="results-card" style="display:none;">
+        <div class="panel-card-title">Detection Results</div>
+
+        <div class="results-box show">
+          <div>
+            <div class="result-headline" id="result-olive-pct">—</div>
+            <div class="result-sub">of selected area is olive grove</div>
+          </div>
+
+          <div style="display:flex;gap:12px;margin:4px 0;">
+            <div style="flex:1;background:rgba(96,162,44,0.08);border:1px solid rgba(96,162,44,0.15);border-radius:10px;padding:12px;text-align:center;">
+              <div style="font-size:1.6rem;font-weight:900;color:var(--olive-3);" id="result-ha">—</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Hectares</div>
+            </div>
+            <div style="flex:1;background:rgba(96,162,44,0.08);border:1px solid rgba(96,162,44,0.15);border-radius:10px;padding:12px;text-align:center;">
+              <div style="font-size:1.6rem;font-weight:900;color:var(--olive-3);" id="result-time">—</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Seconds</div>
+            </div>
+          </div>
+
+          <div id="class-bars" style="display:flex;flex-direction:column;gap:8px;margin-top:4px;"></div>
+
+          <div class="tile-info" id="tile-info">
+            <span>📡</span><span id="tile-name">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Legend card -->
+      <div class="panel-card">
+        <div class="panel-card-title">Class Legend</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="width:12px;height:12px;border-radius:3px;background:rgb(56,120,22);flex-shrink:0;"></div>
+            <span style="font-size:13px;">Olive Grove</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="width:12px;height:12px;border-radius:3px;background:rgb(140,100,22);flex-shrink:0;"></div>
+            <span style="font-size:13px;">Vineyard</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="width:12px;height:12px;border-radius:3px;background:rgb(22,130,80);flex-shrink:0;"></div>
+            <span style="font-size:13px;">Other Orchard</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="width:12px;height:12px;border-radius:3px;background:rgb(195,158,48);flex-shrink:0;"></div>
+            <span style="font-size:13px;">Arable Crop</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="width:12px;height:12px;border-radius:3px;background:rgb(215,68,68);flex-shrink:0;"></div>
+            <span style="font-size:13px;">Building</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="width:12px;height:12px;border-radius:3px;background:rgb(110,110,110);flex-shrink:0;"></div>
+            <span style="font-size:13px;">Road</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════ TECHNOLOGY ════════════════════════════════ -->
+<section id="tech">
+  <div class="tech-grid">
+    <div class="tech-copy">
+      <p class="section-label">The Science</p>
+      <h2 class="section-title">Why 4 Seasons<br/>Change Everything</h2>
+      <p class="section-sub">A single satellite photo is not enough. Olive trees look identical to almonds in summer. But across a full year, their growth patterns are completely unique.</p>
+
+      <div class="tech-features">
+        <div class="tech-feature">
+          <span class="tech-feature-icon">🌸</span>
+          <div>
+            <div class="tech-feature-title">Phenological Analysis</div>
+            <div class="tech-feature-desc">By fusing 4 seasonal images into a 56-band tensor, the model learns the full lifecycle of each crop — not just one frozen moment in time.</div>
+          </div>
+        </div>
+        <div class="tech-feature">
+          <span class="tech-feature-icon">🛡️</span>
+          <div>
+            <div class="tech-feature-title">False Positive Rejection</div>
+            <div class="tech-feature-desc">Almond orchards look identical to olive groves in a single photo. The model rejects them because their seasonal lifecycle is completely different.</div>
+          </div>
+        </div>
+        <div class="tech-feature">
+          <span class="tech-feature-icon">📡</span>
+          <div>
+            <div class="tech-feature-title">Sentinel-2 Multispectral</div>
+            <div class="tech-feature-desc">10m resolution, 10 bands per season including NIR, SWIR, and Red Edge — plus 4 computed vegetation indices (NDVI, EVI, NDWI, SAVI).</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arch-visual">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;letter-spacing:1px;text-transform:uppercase;">Model Architecture</div>
+      <div class="arch-layer">
+        <span class="arch-layer-name">Input</span>
+        <span class="arch-layer-meta">56 bands · 4 seasons × 14</span>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-layer">
+        <span class="arch-layer-name">Encoder</span>
+        <span class="arch-layer-meta">EfficientNet-B4</span>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-layer">
+        <span class="arch-layer-name">Bridge</span>
+        <span class="arch-layer-meta">Skip Connections</span>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-layer">
+        <span class="arch-layer-name">Decoder</span>
+        <span class="arch-layer-meta">U-Net Upsampling</span>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-layer" style="border-color:rgba(96,162,44,0.3);background:rgba(96,162,44,0.08);">
+        <span class="arch-layer-name" style="color:var(--olive-3);">Output</span>
+        <span class="arch-layer-meta">7 Classes · IoU 0.68</span>
+      </div>
+
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid rgba(96,162,44,0.1);">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Training</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          <span style="font-size:11px;padding:4px 10px;background:rgba(96,162,44,0.08);border:1px solid rgba(96,162,44,0.15);border-radius:6px;color:var(--text-muted);">EuroCrop Labels</span>
+          <span style="font-size:11px;padding:4px 10px;background:rgba(96,162,44,0.08);border:1px solid rgba(96,162,44,0.15);border-radius:6px;color:var(--text-muted);">OpenStreetMap</span>
+          <span style="font-size:11px;padding:4px 10px;background:rgba(96,162,44,0.08);border:1px solid rgba(96,162,44,0.15);border-radius:6px;color:var(--text-muted);">Focal Loss</span>
+          <span style="font-size:11px;padding:4px 10px;background:rgba(96,162,44,0.08);border:1px solid rgba(96,162,44,0.15);border-radius:6px;color:var(--text-muted);">AdamW + OneCycleLR</span>
+          <span style="font-size:11px;padding:4px 10px;background:rgba(96,162,44,0.08);border:1px solid rgba(96,162,44,0.15);border-radius:6px;color:var(--text-muted);">Epoch 21 Best</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════ FOOTER ═══════════════════════════════ -->
+<footer>
+  <div class="footer-inner">
+    <div>
+      <div class="footer-brand">🫒 Zitoun Eye</div>
+      <div class="footer-brand-desc">
+        AI-powered olive grove detection using 4-season Sentinel-2 satellite imagery.<br/>
+        EfficientNet-B4 U-Net · Olive IoU 0.68 · 7 land classes.
+      </div>
+    </div>
+    <div>
+      <div class="footer-col-title">Platform</div>
+      <div class="footer-links">
+        <a href="#tool">Analyze Map</a>
+        <a href="#how">How It Works</a>
+        <a href="#tech">Technology</a>
+      </div>
+    </div>
+    <div>
+      <div class="footer-col-title">Data</div>
+      <div class="footer-links">
+        <a href="https://sentinels.copernicus.eu/" target="_blank">Sentinel-2 ESA</a>
+        <a href="https://ec.europa.eu/eurostat/web/nuts/eurocrop" target="_blank">EuroCrop Labels</a>
+        <a href="https://www.openstreetmap.org/" target="_blank">OpenStreetMap</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2024 Zitoun Eye · Built with EfficientNet-B4 + Sentinel-2</span>
+    <span>Coverage: Tunisia · Satellite: ESA Copernicus</span>
+  </div>
+</footer>
+
+<!-- ══════════════════════════════════ JS ════════════════════════════════════ -->
+<script>
+const API = 'http://localhost:8000';
+
+// ─── NAV scroll effect ──────────────────────────────────────────────────────
+window.addEventListener('scroll', () => {
+  document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 40);
+});
+
+// ─── Counter animations ─────────────────────────────────────────────────────
+const counters = document.querySelectorAll('.stat-num[data-target]');
+const countObs = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (!entry.isIntersecting) return;
+    const el   = entry.target;
+    const end  = parseFloat(el.dataset.target);
+    const dec  = parseInt(el.dataset.decimal);
+    const dur  = 1400;
+    const start = performance.now();
+    const tick  = now => {
+      const t = Math.min((now - start) / dur, 1);
+      const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
+      el.textContent = (end * ease).toFixed(dec);
+      if (t < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    countObs.unobserve(el);
+  });
+}, { threshold: 0.5 });
+counters.forEach(c => countObs.observe(c));
+
+// ─── Map setup ──────────────────────────────────────────────────────────────
+const map = L.map('map', {
+  center: [36.5, 3.0],
+  zoom: 6,
+  zoomControl: true,
+  attributionControl: true,
+});
+
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Esri World Imagery · © OpenStreetMap',
+  maxZoom: 19,
+}).addTo(map);
+
+// Coverage zones (Tunisia WGS84 + Spain UTM 30N)
+const COVERAGE = [
+  { bounds: [[34.6999, 10.0500], [34.8501, 10.2500]], name: 'Sfax Region A' },
+  { bounds: [[34.6500, 10.5999], [34.8000, 10.8001]], name: 'Sfax Region B' },
+  { bounds: [[36.6565, 10.4578], [36.6766, 10.4779]], name: 'Nabeul Region' },
+  { bounds: [[36.6148, 10.2919], [36.6649, 10.3420]], name: 'Tunis Region' },
+  { bounds: [[33.5991,  8.8761], [33.7992,  9.0761]], name: 'Gabès Region' },
+  { bounds: [[37.3909, -3.1078], [37.7868, -2.4973]], name: 'Jaén Region' },
+  { bounds: [[37.9221, -5.6743], [38.7480, -4.6739]], name: 'Córdoba Region' },
+  { bounds: [[36.8274, -5.5351], [37.2514, -4.8408]], name: 'Sevilla Region' },
+];
+
+// Draw coverage zones
+COVERAGE.forEach(zone => {
+  L.rectangle(zone.bounds, {
+    color: '#73a02c',
+    weight: 1.5,
+    fillColor: '#73a02c',
+    fillOpacity: 0.06,
+    dashArray: '6 4',
+    interactive: false,
+  }).addTo(map);
+
+  const center = [
+    (zone.bounds[0][0] + zone.bounds[1][0]) / 2,
+    (zone.bounds[0][1] + zone.bounds[1][1]) / 2,
+  ];
+  L.marker(center, {
+    icon: L.divIcon({
+      className: 'coverage-zone-label',
+      html: zone.name,
+    }),
+    interactive: false,
+  }).addTo(map);
+});
+
+// ─── Draw tool ──────────────────────────────────────────────────────────────
+let drawMode    = false;
+let drawStart   = null;
+let drawRect    = null;
+let resultRect  = null;
+let resultOverlay = null;
+let finalBounds = null;
+
+function toggleDraw() {
+  if (drawMode) {
+    disableDraw();
+  } else {
+    enableDraw();
+  }
+}
+
+function enableDraw() {
+  drawMode = true;
+  map.dragging.disable();
+  map.getContainer().style.cursor = 'crosshair';
+  document.getElementById('btn-draw').classList.add('active');
+  document.getElementById('btn-draw').innerHTML = '✕ Cancel Draw';
+  document.getElementById('hint-overlay').textContent = '📐 Click and drag to draw your analysis area';
+  map.on('mousedown', onMapMouseDown);
+}
+
+function disableDraw() {
+  drawMode = false;
+  drawStart = null;
+  map.dragging.enable();
+  map.getContainer().style.cursor = '';
+  document.getElementById('btn-draw').classList.remove('active');
+  document.getElementById('btn-draw').innerHTML = '✏️ Draw Area';
+  document.getElementById('hint-overlay').textContent = '📡 Draw a rectangle within the green zones to analyze';
+  map.off('mousedown', onMapMouseDown);
+  map.off('mousemove', onMapMouseMove);
+  map.off('mouseup', onMapMouseUp);
+}
+
+function onMapMouseDown(e) {
+  if (!drawMode) return;
+  drawStart = e.latlng;
+  map.on('mousemove', onMapMouseMove);
+  map.once('mouseup', onMapMouseUp);
+}
+
+function onMapMouseMove(e) {
+  if (!drawStart) return;
+  if (drawRect) map.removeLayer(drawRect);
+  drawRect = L.rectangle(L.latLngBounds(drawStart, e.latlng), {
+    color: '#73a02c',
+    weight: 2,
+    dashArray: '6 4',
+    fillColor: '#a3c240',
+    fillOpacity: 0.08,
+  }).addTo(map);
+}
+
+function onMapMouseUp(e) {
+  map.off('mousemove', onMapMouseMove);
+  if (!drawStart) return;
+
+  finalBounds = L.latLngBounds(drawStart, e.latlng);
+  if (drawRect) { map.removeLayer(drawRect); drawRect = null; }
+
+  // Solid selection rectangle
+  if (resultRect) map.removeLayer(resultRect);
+  resultRect = L.rectangle(finalBounds, {
+    color: '#73a02c',
+    weight: 2,
+    fillColor: '#a3c240',
+    fillOpacity: 0.06,
+  }).addTo(map);
+
+  disableDraw();
+
+  // Enable analyze button
+  document.getElementById('btn-analyze').classList.add('ready');
+  document.getElementById('btn-analyze').innerHTML = '🧠 Analyze Now';
+  document.getElementById('btn-clear').style.display = 'inline-flex';
+
+  // Update step indicators
+  setStep(2);
+  hideError();
+}
+
+function clearSelection() {
+  if (resultRect) { map.removeLayer(resultRect); resultRect = null; }
+  if (resultOverlay) { map.removeLayer(resultOverlay); resultOverlay = null; }
+  finalBounds = null;
+  drawStart   = null;
+
+  document.getElementById('btn-analyze').classList.remove('ready');
+  document.getElementById('btn-analyze').innerHTML = '🧠 Analyze Now';
+  document.getElementById('btn-clear').style.display = 'none';
+  document.getElementById('results-card').style.display = 'none';
+  document.getElementById('hint-overlay').classList.remove('hidden');
+  hideError();
+  setStep(1);
+}
+
+// ─── Analysis ───────────────────────────────────────────────────────────────
+async function runAnalysis() {
+  if (!finalBounds) return;
+
+  const btn = document.getElementById('btn-analyze');
+  btn.classList.remove('ready');
+  btn.classList.add('loading');
+  btn.innerHTML = '<div class="spinner"></div> Analyzing…';
+  hideError();
+  setStep(2);
+
+  const sw = finalBounds.getSouthWest();
+  const ne = finalBounds.getNorthEast();
+
+  try {
+    const res = await fetch(`${API}/api/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        west: sw.lng, south: sw.lat,
+        east: ne.lng, north: ne.lat,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.detail || 'Analysis failed');
+    }
+
+    showResults(data, finalBounds);
+    setStep(3);
+
+  } catch (err) {
+    showError(err.message.includes('fetch') ?
+      'Could not reach the AI server. Make sure it\'s running:\n\npython src/backend/main.py' :
+      err.message
+    );
+    btn.innerHTML = '🧠 Analyze Now';
+    btn.classList.add('ready');
+    btn.classList.remove('loading');
+  }
+}
+
+function showResults(data, bounds) {
+  // Remove old overlay
+  if (resultOverlay) map.removeLayer(resultOverlay);
+
+  // Add prediction image overlay
+  const imgBounds = [
+    [data.bounds.south, data.bounds.west],
+    [data.bounds.north, data.bounds.east],
+  ];
+  const imgUrl = 'data:image/png;base64,' + data.image_b64;
+  resultOverlay = L.imageOverlay(imgUrl, imgBounds, { opacity: 0.85 }).addTo(map);
+  map.fitBounds(imgBounds, { padding: [40, 40] });
+
+  // Stats
+  const oliveStat = data.stats.find(s => s.class === 'olive_grove');
+  const olivePct  = oliveStat ? oliveStat.pct : 0;
+
+  // Estimate hectares: 1° lat ≈ 111km, 1° lon ≈ 111*cos(lat) km
+  const lat = (data.bounds.south + data.bounds.north) / 2;
+  const dLat = data.bounds.north - data.bounds.south;
+  const dLon = data.bounds.east  - data.bounds.west;
+  const areaSqKm = dLat * 111 * dLon * 111 * Math.cos(lat * Math.PI / 180);
+  const ha = Math.round(areaSqKm * 100 * olivePct / 100);
+
+  document.getElementById('result-olive-pct').textContent = olivePct.toFixed(1) + '%';
+  document.getElementById('result-ha').textContent = ha.toLocaleString();
+  document.getElementById('result-time').textContent = data.elapsed_s?.toFixed(1) || '—';
+  document.getElementById('tile-name').textContent = data.tile || '—';
+
+  // Class bars
+  const barsEl = document.getElementById('class-bars');
+  barsEl.innerHTML = '';
+  data.stats
+    .filter(s => s.class !== 'background')
+    .sort((a,b) => b.pct - a.pct)
+    .forEach(s => {
+      barsEl.innerHTML += `
+        <div class="class-bar-row">
+          <div class="class-name">${s.label}</div>
+          <div class="class-bar-track">
+            <div class="class-bar-fill" style="width:${s.pct}%;background:${s.color};"></div>
+          </div>
+          <div class="class-pct">${s.pct.toFixed(1)}%</div>
+        </div>
+      `;
+    });
+
+  // Show results card
+  const card = document.getElementById('results-card');
+  card.style.display = 'block';
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  // Update buttons
+  const btn = document.getElementById('btn-analyze');
+  btn.classList.remove('loading');
+  btn.classList.add('ready');
+  btn.innerHTML = '🔄 Re-Analyze';
+  document.getElementById('hint-overlay').classList.add('hidden');
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-box');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+function hideError() {
+  document.getElementById('error-box').classList.remove('show');
+}
+
+// ─── Step indicators ────────────────────────────────────────────────────────
+function setStep(n) {
+  for (let i = 1; i <= 3; i++) {
+    const el = document.getElementById(`ind-${i}`);
+    el.classList.remove('active','done');
+    if (i < n)  el.classList.add('done');
+    if (i === n) el.classList.add('active');
+  }
+}
+
+// ─── Fetch real coverage from backend ───────────────────────────────────────
+(async () => {
+  try {
+    const res = await fetch(`${API}/api/coverage`);
+    if (res.ok) {
+      const zones = await res.json();
+      console.log(`[ZitounEye] Backend online — ${zones.length} tiles available.`);
+    }
+  } catch {
+    console.log('[ZitounEye] Backend offline — running in demo mode.');
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,163 @@
+# ============================================================
+# ZitounEye — Default Configuration
+# ============================================================
+
+# --- Project Paths ---
+paths:
+  project_root: "."
+  raw_shapefiles: "ES_2023/ES_2023"
+  labels_dir: "data/labels"
+  imagery_dir: "data/imagery"
+  patches_dir: "data/patches"
+  checkpoints_dir: "checkpoints"
+  logs_dir: "logs"
+  predictions_dir: "predictions"
+
+# --- Class Definitions ---
+# Maps EuroCrop original_code to our 7-class schema
+classes:
+  num_classes: 7
+  names:
+    - "background"
+    - "olive_grove"
+    - "vineyard"
+    - "other_orchard"
+    - "arable_crop"
+    - "building"
+    - "road"
+  colors:  # RGB for visualization
+    - [0, 0, 0]         # background — black
+    - [34, 139, 34]      # olive — forest green
+    - [128, 0, 128]      # vineyard — purple
+    - [255, 165, 0]      # other orchard — orange
+    - [255, 255, 0]      # arable — yellow
+    - [255, 0, 0]        # building — red
+    - [128, 128, 128]    # road — gray
+
+  # Spanish crop codes → class mapping
+  olive_codes: [101, 349, 363]               # OLIVO, OLIVAR-FRUTAL, ACEBUCHE
+  vineyard_codes: [102, 103, 120, 221, 333, 348]  # VIÑA, UVA DE MESA, VIÑA-OLIVAR, etc.
+  other_orchard_codes: [104, 105, 106, 107, 108, 109, 110, 111, 112, 113,  # almond→other fruits
+                        117, 122, 123, 124, 125,                            # chestnut, carob, hazel, pistachio, nuts
+                        192, 204, 205, 206, 207, 208, 209, 210,            # berries, citrus
+                        211, 212, 213, 214, 216, 217, 218,                 # quince→fig
+                        343, 344, 345, 346, 347,                           # avocado, mango, cherimoya, papaya, mulberry
+                        939, 353]                                           # almond-olive, cherry-olive (mixed → orchard)
+  # Everything else with HCAT3 codes starting with 3301 → arable
+  # Buildings + roads come from OSM, not EuroCrop
+
+# --- Sentinel-2 Configuration ---
+sentinel2:
+  collection: "COPERNICUS/S2_SR_HARMONIZED"
+  year: 2023
+  cloud_cover_max: 30    # max scene-level cloud %
+  resolution: 10          # meters/pixel
+  tile_size_meters: 10240  # 1024px × 10m = 10.24km tiles
+  bands:
+    spectral: ["B2", "B3", "B4", "B5", "B6", "B7", "B8", "B8A", "B11", "B12"]
+    indices: ["NDVI", "EVI"]
+  monthly_composites: true
+  # Which months to use — all 12 for full phenological signal
+  months: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+
+# --- Provinces to Process ---
+# Start with olive-heavy Andalusian provinces
+provinces:
+  train: ["es_j_2023", "es_co_2023", "es_se_2023", "es_gr_2023", "es_ma_2023"]
+  val: ["es_ca_2023"]
+  test: ["es_h_2023"]
+  # j=Jaén, co=Córdoba, se=Sevilla, gr=Granada, ma=Málaga
+  # ca=Cádiz (val), h=Huelva (test)
+  # These are the olive heartland of Spain — Jaén alone produces ~50% of Spain's olive oil
+
+# --- Dataset Creation ---
+dataset:
+  patch_size: 256           # pixels (256 × 10m = 2.56km)
+  patch_overlap: 64         # pixels
+  min_valid_fraction: 0.5   # skip patches with >50% nodata
+  max_single_class: 0.95    # skip patches where one class >95%
+  min_olive_patches: 0.15   # ensure ≥15% of patches contain olive
+  normalize: true
+  # Number of temporal composites to stack
+  # For single-date: use best composite (e.g. July)
+  # For multi-temporal: stack 4 seasons (spring/summer/fall/winter)
+  temporal_mode: "seasonal"  # "single" | "seasonal" | "monthly"
+  seasons:
+    spring: [3, 4, 5]
+    summer: [6, 7, 8]
+    fall: [9, 10, 11]
+    winter: [12, 1, 2]
+
+# --- Model Configuration ---
+model:
+  # Tier 1: U-Net (build first)
+  tier1:
+    architecture: "Unet"
+    encoder: "efficientnet-b4"
+    encoder_weights: "imagenet"
+    in_channels: 48  # 12 bands × 4 seasons
+    classes: 7
+    activation: null  # logits — softmax applied in loss
+
+  # Tier 2: DeepLabV3+ (upgrade after Tier 1 works)
+  tier2:
+    architecture: "DeepLabV3Plus"
+    encoder: "efficientnet-b4"
+    encoder_weights: "imagenet"
+    in_channels: 48
+    classes: 7
+    activation: null
+
+# --- Training Configuration ---
+training:
+  batch_size: 16
+  epochs: 100
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  scheduler: "onecycle"
+  optimizer: "adamw"
+
+  # Loss function
+  loss:
+    type: "dice_focal"       # "dice_focal" | "dice_ce" | "focal"
+    dice_weight: 0.5
+    focal_weight: 0.5
+    focal_gamma: 2.0
+    class_weights: [0.1, 3.0, 1.5, 1.5, 0.5, 2.0, 2.0]
+    # olive upweighted 3× because it's the target; background downweighted
+
+  # Augmentation
+  augmentation:
+    horizontal_flip: true
+    vertical_flip: true
+    random_rotate_90: true
+    random_brightness_contrast: true
+    elastic_transform: true
+    grid_distortion: true
+
+  # Early stopping
+  early_stopping:
+    patience: 15
+    monitor: "val_miou"
+    mode: "max"
+
+  # Mixed precision
+  amp: true
+
+  # Number of dataloader workers
+  num_workers: 4
+
+# --- Evaluation ---
+evaluation:
+  # Focus classes for confusion analysis
+  confusion_focus: ["olive_grove", "vineyard", "other_orchard"]
+  min_acceptable_olive_iou: 0.70
+
+# --- Inference ---
+inference:
+  patch_size: 256
+  overlap: 128             # more overlap than training for smoother predictions
+  batch_size: 32
+  tta: true                # test-time augmentation (flip + rotate)
+  ensemble: true           # average U-Net + DeepLabV3+ predictions
+  confidence_threshold: 0.5
