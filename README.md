@@ -12,10 +12,10 @@
 > ZitounEye is a deep-learning model that looks at Sentinel-2 satellite imagery and labels every 10 m pixel as olive grove, vineyard, orchard, arable land, building, road or background.
 
 <p align="center">
-  <img src="research_paper/figures/pred_sfax_region.png" width="49%" alt="ZitounEye prediction over the Sfax olive belt, Tunisia"/>
-  <img src="research_paper/figures/pred_jaen_4season_w1.png" width="49%" alt="ZitounEye prediction over Jaén, Spain"/>
+  <img src="research_paper/figures/pred_sfax_city.png" width="49%" alt="Zitoun Eye prediction over Sfax, Tunisia"/>
+  <img src="research_paper/figures/pred_baza_granada_4season.png" width="49%" alt="Zitoun Eye prediction over Baza, Granada, Spain"/>
   <br/>
-  <em>Left: Sfax, Tunisia (the model was never trained on Tunisian labels). Right: Jaén, Spain (the training domain). 🟢 = olive grove</em>
+  <em>Left: Sfax city and its olive belt, Tunisia (the model was never trained on Tunisian labels). Right: Baza, Granada, Andalusia, Spain (full 4-season input). 🟢 = olive grove</em>
 </p>
 
 ---
@@ -112,19 +112,19 @@ Adding more provinces gave the clearest improvement, which supports the idea tha
 
 ### 🇹🇳 Tunisia: transfer with no Tunisian labels
 
-| Sfax Governorate (rural Sahel olive belt) | Sfax city & peri-urban groves |
+| Sfax city & surrounding olive groves (10.60–10.80°E, 34.65–34.80°N) | Bir Ali Ben Khalifa, Sfax Governorate, ~60 km inland (10.05–10.25°E, 34.70–34.85°N) |
 |---|---|
-| ![Sfax region](research_paper/figures/pred_sfax_region.png) | ![Sfax city](research_paper/figures/pred_sfax_city.png) |
-| **Tozeur (oasis / desert margin)** | **Mornag, Ben Arous (south of Tunis)** |
-| ![Tozeur](research_paper/figures/pred_tozeur.png) | ![Mornag](research_paper/figures/pred_mornag_ben_arous.png) |
+| ![Sfax city](research_paper/figures/pred_sfax_city.png) | ![Bir Ali Ben Khalifa](research_paper/figures/pred_bir_ali_ben_khalifa_sfax.png) |
+| **Kébili (oasis / desert margin, 8.88–9.08°E, 33.60–33.80°N)** | **Mornag, Ben Arous (south of Tunis)** |
+| ![Kébili](research_paper/figures/pred_kebili.png) | ![Mornag](research_paper/figures/pred_mornag_ben_arous.png) |
 
-The Sfax region, one of the densest olive landscapes in the world, comes out as large, coherent olive (green) blocks, without any Tunisian training data.
+Around Sfax, the model separates the city (roads, buildings) and the coast from the olive groves (green) to the south-west, and at Bir Ali Ben Khalifa it finds large olive blocks inland, all without any Tunisian training data.
 
-### 🇪🇸 Spain: full 4-season input (best case)
+### 🇪🇸 Spain: full 4-season input (best case, eastern Andalusia)
 
-| Jaén, window 0 | Jaén, window 1 (olive heartland) |
+| Pozo Alcón, Jaén | Caniles / Baza, Granada |
 |---|---|
-| ![Jaén w0](research_paper/figures/pred_jaen_4season_w0.png) | ![Jaén w1](research_paper/figures/pred_jaen_4season_w1.png) |
+| ![Pozo Alcón](research_paper/figures/pred_pozo_alcon_jaen_4season.png) | ![Baza](research_paper/figures/pred_baza_granada_4season.png) |
 
 The georeferenced GeoTIFFs for all of these maps are in [`results/`](results/) and can be opened directly in **QGIS** or Google Earth.
 
@@ -135,7 +135,7 @@ Colours: 🟢 olive · 🟣 vineyard · 🟠 orchard · 🟡 arable · 🔴 buil
 ## ⚠️ Honest limitations
 
 - **No Tunisian ground truth yet.** The Tunisia results are checked by eye against known olive regions, not scored. Measuring accuracy needs a labelled Tunisian sample.
-- **Single-season inference is weaker.** When one season is copied into all four slots, the model loses the evergreen signal it relies on most. Visible square tile seams in some Tunisian maps (e.g. Sfax) come from this and from the sliding-window patching.
+- **Single-season inference is weaker.** When one season is copied into all four slots, the model loses the evergreen signal it relies on most. Visible square tile seams in some Tunisian maps (e.g. Bir Ali Ben Khalifa) come from this and from the sliding-window patching.
 - **Domain shift.** Tunisian soils are more calcareous and the climate is drier, and traditional Sfax groves are much sparser (~17–20 trees/ha) than Andalusian ones.
 - The Huelva test province has not yet been scored with this checkpoint.
 

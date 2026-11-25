@@ -72,11 +72,11 @@ To evaluate generalization beyond the training domain, inference was performed o
 
 | Test Site | Coordinates (WGS84) | Location | Landscape |
 |---|---|---|---|
-| **Tunisia 1** | 10.05–10.25°E, 34.70–34.85°N | **Sfax Governorate** (rural/coastal) | Olive plantations in semi-arid Sahel plain |
-| **Tunisia 2** | 10.60–10.80°E, 34.65–34.80°N | **Sfax city area** | Peri-urban olive groves, coastal |
+| **Tunisia 1** | 10.05–10.25°E, 34.70–34.85°N | **Bir Ali Ben Khalifa, Sfax Governorate** (inland, ~60 km W of Sfax) | Olive plantations in semi-arid plain |
+| **Tunisia 2** | 10.60–10.80°E, 34.65–34.80°N | **Sfax city area** (Sfax, Tina, El Hajeb) | Peri-urban olive groves, coastal |
 | **Tunisia 3** | 10.46–10.48°E, 36.66–36.68°N | **Grombalia, Nabeul Governorate** | Agricultural plain, vineyards and olives |
 | **Tunisia 4** | 10.29–10.34°E, 36.61–36.66°N | **Mornag, Ben Arous Governorate** | Suburban Tunis, olive and vine plains |
-| **Tunisia 5** | 8.88–9.08°E, 33.60–33.80°N | **Tozeur region** | Oasis agriculture, desert-margin olives |
+| **Tunisia 5** | 8.88–9.08°E, 33.60–33.80°N | **Kébili region** | Oasis agriculture, desert-margin olives |
 
 ---
 
@@ -324,11 +324,11 @@ The Spain-trained model was applied to five Tunisian test sites without any fine
 - ⚪ **Grey** = Road (class 6)
 - ⚫ **Dark** = Background (class 0)
 
-#### 5.2.1 Sfax Governorate — Rural/Coastal (10.05–10.25°E, 34.70–34.85°N)
+#### 5.2.1 Bir Ali Ben Khalifa, Sfax Governorate (10.05–10.25°E, 34.70–34.85°N)
 
-Covers ~20×15 km of the semi-arid Sahel plain west of Sfax, a region known for extensive rain-fed olive plantations.
+Covers ~20×15 km of the inland semi-arid plain around Bir Ali Ben Khalifa, about 60 km west of Sfax city, a region of extensive rain-fed olive plantations.
 
-![Prediction map — Sfax Governorate rural area, 2227×1671 pixels](figures/pred_sfax_region.png)
+![Prediction map — Bir Ali Ben Khalifa, Sfax Governorate, 2227×1671 pixels](figures/pred_bir_ali_ben_khalifa_sfax.png)
 
 #### 5.2.2 Sfax City Area (10.60–10.80°E, 34.65–34.80°N)
 
@@ -348,23 +348,23 @@ Covers the Mornag/Borj Cedria agricultural plain in the southeastern suburbs of 
 
 ![Prediction map — Mornag plain, Ben Arous (south Tunis suburbs), 558×558 pixels](figures/pred_mornag_ben_arous.png)
 
-#### 5.2.5 Tozeur Region (8.88–9.08°E, 33.60–33.80°N)
+#### 5.2.5 Kébili Region (8.88–9.08°E, 33.60–33.80°N)
 
-Covers ~20×20 km near Tozeur in southwestern Tunisia, characterized by oasis agriculture and desert-margin landscapes near Chott el-Jerid.
+Covers ~20×20 km around Kébili in southern Tunisia, characterized by oasis agriculture and desert-margin landscapes on the eastern edge of Chott el-Jerid.
 
-![Prediction map — Tozeur region (oasis/desert-margin), 2227×2227 pixels](figures/pred_tozeur.png)
+![Prediction map — Kébili region (oasis/desert-margin), 2227×2227 pixels](figures/pred_kebili.png)
 
-### 5.3 Spanish 4-Season True Multi-Temporal Predictions (Jaén)
+### 5.3 Spanish 4-Season True Multi-Temporal Predictions (Eastern Andalusia)
 
-These predictions use the **full 4-season input** (true 56-band stack from spring, summer, fall, and winter Sentinel-2 composites) on a Jaén province tile — demonstrating the model's best-case performance when all temporal information is available. Produced by `predict_4season.py` which explicitly loads `final_20260620_104109_best.pth`.
+These predictions use the **full 4-season input** (true 56-band stack from spring, summer, fall, and winter Sentinel-2 composites) on the Jaén imagery tile, which extends into neighbouring Granada — demonstrating the model's best-case performance when all temporal information is available. Produced by `predict_4season.py` which explicitly loads `final_20260620_104109_best.pth`.
 
-#### Window 0 (2500×2500 pixels — northwest corner of tile)
+#### Pozo Alcón, Jaén (2500×2500 pixels)
 
-![Prediction on Jaén 4-season data, Window 0 (2500×2500 px)](figures/pred_jaen_4season_w0.png)
+![Prediction on 4-season data, Pozo Alcón, Jaén (2500×2500 px)](figures/pred_pozo_alcon_jaen_4season.png)
 
-#### Window 1 (2500×2500 pixels — olive grove heartland)
+#### Caniles / Baza, Granada (2500×2500 pixels)
 
-![Prediction on Jaén 4-season data, Window 1 (2500×2500 px)](figures/pred_jaen_4season_w1.png)
+![Prediction on 4-season data, Caniles/Baza, Granada (2500×2500 px)](figures/pred_baza_granada_4season.png)
 
 ---
 
@@ -432,7 +432,7 @@ The multi-temporal approach substantially mitigates this issue via the winter co
 
 ### 7.4 Cross-Border Generalization
 
-The successful qualitative detection of olive groves in Tunisia — a country with different climate (more arid), soil types (calcareous), and cultivation practices — demonstrates the robustness of learned spectral-temporal features. The Sfax Governorate and Tozeur region in particular show high-confidence olive detections in areas known for extensive olive cultivation. However, systematic quantitative evaluation on Tunisian ground truth would be needed to fully validate cross-domain performance.
+The successful qualitative detection of olive groves in Tunisia — a country with different climate (more arid), soil types (calcareous), and cultivation practices — demonstrates the robustness of learned spectral-temporal features. The Sfax Governorate and Kébili region in particular show high-confidence olive detections in areas known for extensive olive cultivation. However, systematic quantitative evaluation on Tunisian ground truth would be needed to fully validate cross-domain performance.
 
 ### 7.5 Limitations
 
@@ -453,7 +453,7 @@ ZitounEye demonstrates that automated olive grove detection from freely availabl
 
 3. **Spatial cross-validation**: Province-level train/val/test splits prevent data leakage and provide an honest estimate of the model's ability to generalize to unseen geographic areas.
 
-4. **Cross-border inference**: The Spain-trained model produces qualitatively plausible olive grove maps when applied to Tunisian imagery from five distinct sites (Sfax, Grombalia, Mornag, Tozeur), suggesting that learned spectral-temporal features are transferable across Mediterranean olive-growing regions.
+4. **Cross-border inference**: The Spain-trained model produces qualitatively plausible olive grove maps when applied to Tunisian imagery from five distinct sites (Sfax, Bir Ali Ben Khalifa, Grombalia, Mornag, Kébili), suggesting that learned spectral-temporal features are transferable across Mediterranean olive-growing regions.
 
 5. **Interactive deployment**: A web application with FastAPI backend and Leaflet frontend enables non-expert users to draw a region on a map and receive olive grove classification results in seconds.
 
